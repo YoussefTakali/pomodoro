@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlay, faSyncAlt, faCog } from '@fortawesome/free-solid-svg-icons';
+import { faPlay, faPause, faSyncAlt, faCog } from '@fortawesome/free-solid-svg-icons';
 import './style.css';
 
 function PomodoroTimer() {
-  const [workDuration, setWorkDuration] = useState(25);
-  const [breakDuration, setBreakDuration] = useState(5);
-  const [minutes, setMinutes] = useState(workDuration);
-  const [seconds, setSeconds] = useState(0);
+  const [workDuration, setWorkDuration] = useState(25 * 60);
+  const [breakDuration, setBreakDuration] = useState(5 * 60);
+  const [timeLeft, setTimeLeft] = useState(workDuration);
   const [isRunning, setIsRunning] = useState(false);
+  const [isWorkTime, setIsWorkTime] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
@@ -16,35 +16,40 @@ function PomodoroTimer() {
 
     if (isRunning) {
       intervalId = setInterval(() => {
-        if (seconds > 0) {
-          setSeconds(seconds - 1);
-        } else if (minutes > 0) {
-          setMinutes(minutes - 1);
-          setSeconds(59);
-        } else {
-          setIsRunning(false);
-          if (workDuration > 0) {
-            setMinutes(workDuration);
+        setTimeLeft((prevTimeLeft) => {
+          if (prevTimeLeft > 0) {
+            return prevTimeLeft - 1;
           } else {
-            setMinutes(breakDuration);
+            setIsWorkTime((prevIsWorkTime) => {
+              if (prevIsWorkTime) {
+                return false; // Switch to break time
+              } else {
+                return true; // Switch to work time
+              }
+            });
+            return isWorkTime ? breakDuration : workDuration;
           }
-        }
+        });
       }, 1000);
     } else {
       clearInterval(intervalId);
     }
 
     return () => clearInterval(intervalId);
-  }, [isRunning, minutes, seconds, workDuration, breakDuration]);
+  }, [isRunning, timeLeft, workDuration, breakDuration, isWorkTime]);
 
   const startTimer = () => {
     setIsRunning(true);
   };
 
+  const pauseTimer = () => {
+    setIsRunning(false);
+  };
+
   const resetTimer = () => {
     setIsRunning(false);
-    setMinutes(workDuration);
-    setSeconds(0);
+    setIsWorkTime(true);
+    setTimeLeft(workDuration);
   };
 
   const toggleSettingsModal = () => {
@@ -52,9 +57,9 @@ function PomodoroTimer() {
   };
 
   const getCircleColor = () => {
-    const totalSeconds = minutes * 60 + seconds;
-    const totalTime = workDuration * 60;
-    const percentage = totalSeconds / totalTime;
+    const totalTime = isWorkTime ? workDuration : breakDuration;
+    const remainingTime = timeLeft;
+    const percentage = remainingTime / totalTime;
 
     const green = Math.min(Math.floor(255 * (1 - percentage * 2)), 255);
     const red = Math.min(Math.floor(255 * (percentage * 2 - 1)), 255);
@@ -62,27 +67,36 @@ function PomodoroTimer() {
     return `linear-gradient(to bottom, rgb(${green}, 255, 0), rgb(${red}, 0, 0))`;
   };
 
+  const formatTime = (time) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = time % 60;
+    return `${minutes < 10 ? `0${minutes}` : minutes}:${seconds < 10 ? `0${seconds}` : seconds}`;
+  };
+
   return (
     <section>
       <div className="container">
+        <h1>pomodoro</h1>
 
         <div className="painel">
-          <p id="work" className={workDuration === minutes ? 'active' : ''} onClick={() => setMinutes(workDuration)}>work</p>
-          <p id="break" className={breakDuration === minutes ? 'active' : ''} onClick={() => setMinutes(breakDuration)}>break</p>
+          <p id="work" className={isWorkTime ? 'active' : ''} onClick={() => { setIsWorkTime(true); setTimeLeft(workDuration); }}>work</p>
+          <p id="break" className={!isWorkTime ? 'active' : ''} onClick={() => { setIsWorkTime(false); setTimeLeft(breakDuration); }}>break</p>
         </div>
 
         <div className="timer">
           <div className="circle" style={{ background: getCircleColor() }}>
             <div className="time">
-              <p id="minutes">{minutes < 10 ? `0${minutes}` : minutes}</p>
-              <p>:</p>
-              <p id="seconds">{seconds < 10 ? `0${seconds}` : seconds}</p>
+              <p>{formatTime(timeLeft)}</p>
             </div>
           </div>
         </div>
 
         <div className="controls">
-          <button id="start" onClick={startTimer}><FontAwesomeIcon icon={faPlay} /></button>
+          {isRunning ? (
+            <button id="pause" onClick={pauseTimer}><FontAwesomeIcon icon={faPause} /></button>
+          ) : (
+            <button id="start" onClick={startTimer}><FontAwesomeIcon icon={faPlay} /></button>
+          )}
           <button id="reset" onClick={resetTimer}><FontAwesomeIcon icon={faSyncAlt} /></button>
           <button id="settings" onClick={toggleSettingsModal}><FontAwesomeIcon icon={faCog} /></button>
         </div>
@@ -97,15 +111,15 @@ function PomodoroTimer() {
               <input
                 type="number"
                 id="workDuration"
-                value={workDuration}
-                onChange={(e) => setWorkDuration(parseInt(e.target.value))}
+                value={workDuration / 60}
+                onChange={(e) => setWorkDuration(parseInt(e.target.value) * 60)}
               />
               <label htmlFor="breakDuration">Break Duration (minutes):</label>
               <input
                 type="number"
                 id="breakDuration"
-                value={breakDuration}
-                onChange={(e) => setBreakDuration(parseInt(e.target.value))}
+                value={breakDuration / 60}
+                onChange={(e) => setBreakDuration(parseInt(e.target.value) * 60)}
               />
               <button onClick={toggleSettingsModal}>Save</button>
             </div>
